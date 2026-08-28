@@ -211,6 +211,16 @@ refer to detailed examples in `usermods/EXAMPLE/`, `usermods/user_fx/` and [in t
 - Store repeated strings as `static const char[] PROGMEM`
 - Add usermod IDs to `wled00/const.h` **only when a unique ID is required** (see below)
 
+### Pin ownership via `pinManager`
+- Before performing any operation on I/O pins, the usermod must allocate its pins from the `pinManager`.
+- I/O pins are allocated via `PinManager::allocatePin(byte gpio, bool output, PinOwner tag)` (or `PinManager::allocateMultiplePins()`), and returned via `PinManager::deallocatePin()` when re-configuring pin numbers.
+- `pinManager::allocatePin()` will return an error code in case that a pin is already assigned to another WLED function.
+- You can use `-1` = `255` for unconfigured / unassigned pin functions.
+- Check for valid pin numbers with `pinManager::isPinOk(byte gpio, bool output)`; this function knows which GPI(O) pins are possible on your specific MCU.
+- PIN numbers for I2C and SPI busses are configured globally in the generic part of the usermod settings page.
+- Usually, a usermod will not start the I2C or SPI units explicitly, since they are already initialised when WLED starts.
+- Use this pattern to check for an incomplete I2C setup: `if (i2c_scl<0 || i2c_sda<0) {enabled = false; return;}`.
+
 ### Usermod IDs
 
 A unique ID (registered in `wled00/const.h` and overriding `getId()`) is **only required** when a usermod needs one or more of the following:
