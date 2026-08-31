@@ -880,7 +880,7 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
     else mxconfig.setPixelColorDepthBits(8);
   } else mxconfig.setPixelColorDepthBits(8);
 #else
-  if (physicalPanelWidth * physicalPanelHeight * chainLength > 192*64)
+  if (physicalPanelWidth * physicalPanelHeight * mxconfig.chain_length > 192*64)
     mxconfig.setPixelColorDepthBits(6); // reduce RAM usage for large panels, for the price of reduced color quality (18bit)
   else
     mxconfig.setPixelColorDepthBits(8); // default color resolution = 24bit
