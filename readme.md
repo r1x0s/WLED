@@ -9,6 +9,14 @@
   <a href="https://gitpod.io/#https://github.com/wled-dev/WLED"><img src="https://img.shields.io/badge/Gitpod-ready--to--code-blue?style=flat-square&logo=gitpod"></a>
 </p>
 
+# WLED-LightMusic fork
+
+This is a fork of upstream WLED (base: `v16.0.1`) for distributed sound-reactive lighting:
+an ESP32 master (audio analysis, SoftAP for up to 8 nodes, state heartbeat) and ESP8266 / ESP32-family LED nodes.
+Fork-specific build profiles live in `platformio_lightmusic.ini` (`lightmusic_master_esp32`, `lightmusic_node_*`).
+Project documentation (in Russian) is in [`docs/lightmusic/`](docs/lightmusic/) — start with `spec.md`.
+Upstream documentation follows below.
+
 # Welcome to WLED! ✨
 
 A fast and feature-rich firmware for ESP32 microcontrollers to control addressable LEDs — from simple strips to large 2D matrices and HUB75 panels.
