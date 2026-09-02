@@ -4,7 +4,7 @@
 **Целевая архитектура:** ESP32 NodeMCU как master/контроллер/точка доступа/аудиоанализатор; до 8 ведомых LED-нод (ESP8266 для 1D-лент; ESP32/ESP32-C3/S2/S3 — преимущественно для 2D-матриц).  
 **Рабочая ветка:** `lightmusic/main`  
 **Исходный upstream:** `https://github.com/wled/WLED.git`  
-**Статус документа:** актуализирован по реализованным изменениям.
+**Статус документа:** актуализирован по реализованным изменениям (Этап 1 «Фундамент», 2026-09-02, репозиторий `r1x0s/WLED`).
 
 ---
 
@@ -148,7 +148,7 @@ Master должен использовать штатный режим WLED **AP
 - UDP sync receive;
 - штатное управление LED.
 - Improv Wi‑Fi scan;
-- Particle System 1D/2D.
+- Particle System 1D (2D-вариант PS на ESP8266 невозможен: upstream запрещает 1D и 2D PS одновременно на этой платформе через `#error` в `FX.cpp`; 2D-ноды — на ESP32-семействе).
 
 Отключает:
 
@@ -160,6 +160,7 @@ Master должен использовать штатный режим WLED **AP
 - Adalight;
 - Loxone;
 - ESP-NOW;
+- Particle System 2D.
 
 #### `lightmusic_node_esp32` (и варианты `_c3`/`_s2`/`_s3`)
 
@@ -364,42 +365,41 @@ wled00/xml.cpp
 wled00/network.cpp
 wled00/data/settings_wifi.htm
 wled00/lightmusic_wifi_priority.h
-test/lightmusic_wifi_priority_test.cpp
+test/lightmusic/wifi_priority_test.cpp
 ```
 
 ### 5.2 Master/node PlatformIO profiles и SoftAP capacity
 
 Реализовано:
 
-- профиль `lightmusic_master_esp32`;
-- профиль `lightmusic_node_esp8266`;
-- отдельное compile-time значение `LIGHTMUSIC_AP_MAX_CONNECTIONS`;
-- master использует `LIGHTMUSIC_AP_MAX_CONNECTIONS=7`;
-- ESP32 SoftAP получает max connections через штатный `WiFi.softAP(..., max_connection)`;
-- ESP8266 сохраняет upstream behavior.
-
-> **Расхождение с актуальными требованиями:** реализовано значение 7; по обновлённому FR-2 default должен быть **8**. Требуется поднять `LIGHTMUSIC_AP_MAX_CONNECTIONS` до 8 и обновить тест. Профиль `lightmusic_node_esp32*` (2D-ноды) ещё не создан.
+- профили `lightmusic_master_esp32`, `lightmusic_node_esp8266`, `lightmusic_node_esp32`, `lightmusic_node_esp32c3`, `lightmusic_node_esp32s3`, `lightmusic_node_esp32s2` в `platformio_lightmusic.ini` (подключён через `extra_configs`);
+- compile-time значение `LIGHTMUSIC_AP_MAX_CONNECTIONS` (default **8**), клампер по лимиту платформы в `lightmusic_ap_config.h`;
+- обе платформы передают лимит в штатный `WiFi.softAP(..., max_connection)`;
+- обоснование потолка 8: DHCP-сервер ESP-IDF 4.4 выдаёт максимум 8 адресов.
 
 Основные файлы:
 
 ```text
 platformio.ini
-platformio_override.lightmusic.ini
+platformio_lightmusic.ini
 wled00/lightmusic_ap_config.h
+wled00/const.h
 wled00/wled.h
 wled00/wled.cpp
-test/lightmusic_ap_config_test.cpp
+test/lightmusic/ap_config_test.cpp
 ```
 
 ### 5.3 Heartbeat state synchronization
 
 Реализовано:
 
-- `CALL_MODE_LIGHTMUSIC_HEARTBEAT`;
-- scheduler без burst после задержки loop;
-- master profile с `LIGHTMUSIC_SYNC_HEARTBEAT_INTERVAL=1000`;
+- `CALL_MODE_LIGHTMUSIC_HEARTBEAT` (13);
+- scheduler без burst после задержки loop; обычное уведомление засчитывается как последний heartbeat;
+- master profile с `LIGHTMUSIC_SYNC_HEARTBEAT_INTERVAL=1000`, ноды — 0; runtime-настройка в Settings → Sync (`HB`) и `cfg.json` `if.sync.send.hb`, значения 1…999 поднимаются до 1000;
 - normal WLED UDP snapshot каждую секунду;
-- heartbeat работает вне обычного runtime notify toggle.
+- heartbeat работает вне runtime notify toggle и флагов «on direct change / on button», молчит при активном realtime-потоке;
+- heartbeat не взводит ретрансмиты и не открывает окно подавления входящих пакетов;
+- **исправлен дефект upstream**: в режиме «только SoftAP» broadcast-адрес UDP-sync считался как 0.0.0.255 на ESP32 (шлюз STA отсутствует); теперь используется broadcast подсети AP (`lightmusic_net_utils.h`).
 
 Основные файлы:
 
@@ -407,15 +407,19 @@ test/lightmusic_ap_config_test.cpp
 wled00/const.h
 wled00/udp.cpp
 wled00/wled.cpp
+wled00/wled.h
 wled00/lightmusic_sync_heartbeat.h
-test/lightmusic_sync_heartbeat_test.cpp
+wled00/lightmusic_net_utils.h
+wled00/data/settings_sync.htm
+test/lightmusic/sync_heartbeat_test.cpp
+test/lightmusic/net_utils_test.cpp
 ```
 
 ### 5.4 Core named node registry
 
 Реализовано и покрыто host-тестом:
 
-- ограничение `MaxNodes = 7` (по обновлённому FR-6 требуется поднять до 8);
+- ограничение `kLightmusicMaxNodes = 8`;
 - upsert по MAC;
 - недопущение дубликатов;
 - fallback node name;
@@ -427,7 +431,7 @@ test/lightmusic_sync_heartbeat_test.cpp
 
 ```text
 wled00/lightmusic_node_registry.h
-test/lightmusic_node_registry_test.cpp
+test/lightmusic/node_registry_test.cpp
 ```
 
 > Реестр пока не подключён к сети и UI намеренно: pairing/provisioning должен быть спроектирован безопасно до подключения сетевых side effects.
@@ -465,22 +469,14 @@ npm ci
 npm run build
 npm test
 
-# Host tests
- g++ -std=c++17 -Wall -Wextra -pedantic test/lightmusic_wifi_priority_test.cpp -o /tmp/lightmusic_wifi_priority_test
-/tmp/lightmusic_wifi_priority_test
+# Host tests (g++, -std=c++11 и -std=c++17, -Werror)
+bash test/lightmusic/run.sh
 
-g++ -std=c++17 -Wall -Wextra -pedantic test/lightmusic_ap_config_test.cpp -o /tmp/lightmusic_ap_config_test
-/tmp/lightmusic_ap_config_test
-
-g++ -std=c++17 -Wall -Wextra -pedantic test/lightmusic_sync_heartbeat_test.cpp -o /tmp/lightmusic_sync_heartbeat_test
-/tmp/lightmusic_sync_heartbeat_test
-
-g++ -std=c++17 -Wall -Wextra -pedantic test/lightmusic_node_registry_test.cpp -o /tmp/lightmusic_node_registry_test
-/tmp/lightmusic_node_registry_test
-
-# Firmware builds
-~/.venvs/platformio/bin/pio run -e lightmusic_master_esp32
-~/.venvs/platformio/bin/pio run -e lightmusic_node_esp8266
+# Firmware builds (PlatformIO в venv ~/.venvs/platformio)
+for e in lightmusic_master_esp32 lightmusic_node_esp8266 lightmusic_node_esp32 \
+         lightmusic_node_esp32c3 lightmusic_node_esp32s3 lightmusic_node_esp32s2; do
+  ~/.venvs/platformio/bin/pio run -e $e
+done
 ```
 
 Также:
@@ -495,14 +491,17 @@ git diff --check
 
 ```text
 npm test: 16 / 16 passed
+host tests: 5 модулей × 2 стандарта, все зелёные
 
-lightmusic_master_esp32:
-RAM:   79,688 / 327,680 bytes (24.3%)
-Flash: 1,226,477 / 1,572,864 bytes (78.0%)
+lightmusic_master_esp32:      RAM 79,720 / 327,680 (24.3%)  Flash 1,226,685 / 1,572,864 (78.0%)
+lightmusic_node_esp8266:      RAM 44,932 /  81,920 (54.8%)  Flash   855,023 / 1,044,464 (81.9%)
+lightmusic_node_esp32:        RAM 79,184 / 327,680 (24.2%)  Flash 1,186,881 / 1,572,864 (75.5%)
+lightmusic_node_esp32c3:      RAM 69,656 / 327,680 (21.3%)  Flash 1,150,718 / 1,572,864 (73.2%)
+lightmusic_node_esp32s3:      RAM 42,980 / 327,680 (13.1%)  Flash 1,122,893 / 1,572,864 (71.4%)
+lightmusic_node_esp32s2:      RAM 50,128 / 327,680 (15.3%)  Flash 1,134,106 / 1,572,864 (72.1%)
 
-lightmusic_node_esp8266:
-RAM:   45,076 / 81,920 bytes (55.0%)
-Flash: 845,547 / 1,044,464 bytes (81.0%)
+Эксперимент: ESP8266 с Particle System 2D не собирается (upstream #error: 1D и 2D PS
+одновременно на ESP8266 не поддерживаются) — нода ESP8266 остаётся с PS 1D.
 ```
 
 ### 7.3 Обязательный hardware test matrix
@@ -528,14 +527,22 @@ Flash: 845,547 / 1,044,464 bytes (81.0%)
 
 ```text
 build_output/release/WLED_16.0.1_Lightmusic_Master_ESP32.bin
-build_output/release/WLED_16.0.1_Lightmusic_Node_ESP8266.bin
+build_output/release/WLED_16.0.1_Lightmusic_Node_ESP8266.bin  (+ .bin.gz)
+build_output/release/WLED_16.0.1_Lightmusic_Node_ESP32.bin
+build_output/release/WLED_16.0.1_Lightmusic_Node_ESP32-C3.bin
+build_output/release/WLED_16.0.1_Lightmusic_Node_ESP32-S3_4M.bin
+build_output/release/WLED_16.0.1_Lightmusic_Node_ESP32-S2.bin
 ```
 
-Проверенные SHA-256 на момент сборки heartbeat версии:
+Проверенные SHA-256 сборки Этапа 1 (2026-09-02):
 
 ```text
-2f323f29ea11228e7198460b7209e9ad71ecede8a86d4d290789d83be2de1dd2  WLED_16.0.1_Lightmusic_Master_ESP32.bin
-81153780a35cb1eed9d04d91616f54af10752def5d2ceb73978c300108b18b7e  WLED_16.0.1_Lightmusic_Node_ESP8266.bin
+59c57a2a5aad1a9c13377aa2da303323e7bd6276cea2ff6672926cfce403e336  WLED_16.0.1_Lightmusic_Master_ESP32.bin
+199e0d6e7ae44b1770e84e5e37925bd7413e6d03cad11b92552d91f42d1a76e3  WLED_16.0.1_Lightmusic_Node_ESP8266.bin
+33c81354ee8a2012daf2fd86e9e32bd5638f239a7b4fb4b55831883911fd8800  WLED_16.0.1_Lightmusic_Node_ESP32.bin
+4241a27ce1f06bda41e1f77d8c4f47b9b7d5b5608798348350e784a01432b732  WLED_16.0.1_Lightmusic_Node_ESP32-C3.bin
+ad12f39b6d3cce49a6e81a671cbaf8071cce13f103d531824b159a6115d48352  WLED_16.0.1_Lightmusic_Node_ESP32-S3_4M.bin
+2d23b850db4670956c5cf6fa791d71ca1da042945668cd20b0d8a1c20bf31316  WLED_16.0.1_Lightmusic_Node_ESP32-S2.bin
 ```
 
 > После последующих изменений firmware нужно всегда пересчитать checksums и выдать новые бинарники.
