@@ -230,24 +230,26 @@ void getSettingsJS(byte subPage, Print& settingsScript)
       char bssid[13];
       fillMAC2Str(bssid, multiWiFi[n].bssid);
 #ifdef WLED_ENABLE_WPA_ENTERPRISE
-      settingsScript.printf_P(PSTR("addWiFi(\"%s\",\"%s\",\"%s\",0x%X,0x%X,0x%X,\"%u\",\"%s\",\"%s\");"),
+      settingsScript.printf_P(PSTR("addWiFi(\"%s\",\"%s\",\"%s\",0x%X,0x%X,0x%X,%u,\"%u\",\"%s\",\"%s\");"),
         multiWiFi[n].clientSSID,
         fpass,
         bssid,
         (uint32_t) multiWiFi[n].staticIP, // explicit cast required as this is a struct
         (uint32_t) multiWiFi[n].staticGW,
         (uint32_t) multiWiFi[n].staticSN,
+        multiWiFi[n].priority, // WLED-LightMusic
         multiWiFi[n].encryptionType,
         multiWiFi[n].enterpriseAnonIdentity,
         multiWiFi[n].enterpriseIdentity);
 #else
-      settingsScript.printf_P(PSTR("addWiFi(\"%s\",\"%s\",\"%s\",0x%X,0x%X,0x%X);"),
+      settingsScript.printf_P(PSTR("addWiFi(\"%s\",\"%s\",\"%s\",0x%X,0x%X,0x%X,%u);"),
         multiWiFi[n].clientSSID,
         fpass,
         bssid,
         (uint32_t) multiWiFi[n].staticIP, // explicit cast required as this is a struct
         (uint32_t) multiWiFi[n].staticGW,
-        (uint32_t) multiWiFi[n].staticSN);
+        (uint32_t) multiWiFi[n].staticSN,
+        multiWiFi[n].priority); // WLED-LightMusic
 #endif
     }
 
@@ -493,6 +495,7 @@ void getSettingsJS(byte subPage, Print& settingsScript)
     printSetFormCheckbox(settingsScript,PSTR("SB"),notifyButton);
     printSetFormCheckbox(settingsScript,PSTR("SH"),notifyHue);
     printSetFormValue(settingsScript,PSTR("UR"),udpNumRetries);
+    printSetFormValue(settingsScript,PSTR("HB"),syncHeartbeatInterval); // WLED-LightMusic
 
     printSetFormCheckbox(settingsScript,PSTR("NL"),nodeListEnabled);
     printSetFormCheckbox(settingsScript,PSTR("NB"),nodeBroadcastEnabled);

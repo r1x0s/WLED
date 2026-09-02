@@ -190,6 +190,11 @@ using PSRAMDynamicJsonDocument = BasicJsonDocument<PSRAM_Allocator>;
 #include "const.h"
 #include "colors.h"
 #include "fcn_declare.h"
+// WLED-LightMusic header-only modules (also covered by host tests in test/lightmusic)
+#include "lightmusic_ap_config.h"
+#include "lightmusic_wifi_priority.h"
+#include "lightmusic_net_utils.h"
+#include "lightmusic_sync_heartbeat.h"
 #ifndef WLED_DISABLE_OTA
   #include "ota_update.h"
 #endif
@@ -793,6 +798,9 @@ WLED_GLOBAL bool     udpConnected _INIT(false);
 WLED_GLOBAL bool     udp2Connected _INIT(false);
 WLED_GLOBAL bool     udpRgbConnected _INIT(false);
 #endif
+// WLED-LightMusic: period of the full-state heartbeat in ms (0 = off, otherwise >= 1000); master profile defaults to 1000
+WLED_GLOBAL uint16_t syncHeartbeatInterval _INIT(LIGHTMUSIC_SYNC_HEARTBEAT_INTERVAL);
+WLED_GLOBAL unsigned long lightmusicHeartbeatSentTime _INIT(0);
 
 // ui style
 WLED_GLOBAL bool showWelcomePage _INIT(false);

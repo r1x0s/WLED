@@ -106,6 +106,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
       if (strlen(ssid) > 0) strlcpy(multiWiFi[n].clientSSID, ssid, 33); // this will keep old SSID intact if not present in JSON
       if (strlen(pass) > 0) strlcpy(multiWiFi[n].clientPass, pass, 65); // this will keep old password intact if not present in JSON
       if (strlen(bssid) > 0) fillStr2MAC(multiWiFi[n].bssid, bssid);
+      CJSON(multiWiFi[n].priority, wifi[F("prio")]); // WLED-LightMusic: missing key keeps 0 (legacy cfg.json)
       multiWiFi[n].staticIP = nIP;
       multiWiFi[n].staticGW = nGW;
       multiWiFi[n].staticSN = nSN;
@@ -582,6 +583,8 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   CJSON(syncGroups, if_sync_send["grp"]);
   if (if_sync_send[F("twice")]) udpNumRetries = 1; // import setting from 0.13 and earlier
   CJSON(udpNumRetries, if_sync_send["ret"]);
+  CJSON(syncHeartbeatInterval, if_sync_send["hb"]); // WLED-LightMusic: missing key keeps the build default
+  syncHeartbeatInterval = lightmusicNormalizeHeartbeatInterval(syncHeartbeatInterval);
 
   JsonObject if_nodes = interfaces["nodes"];
   CJSON(nodeListEnabled, if_nodes[F("list")]);
@@ -871,6 +874,7 @@ void serializeConfig(JsonObject root) {
     char bssid[13];
     fillMAC2Str(bssid, multiWiFi[n].bssid);
     wifi[F("bssid")] = bssid;
+    wifi[F("prio")] = multiWiFi[n].priority; // WLED-LightMusic
     JsonArray wifi_ip = wifi.createNestedArray("ip");
     JsonArray wifi_gw = wifi.createNestedArray("gw");
     JsonArray wifi_sn = wifi.createNestedArray("sn");
@@ -1117,6 +1121,7 @@ void serializeConfig(JsonObject root) {
   if_sync_send["hue"] = notifyHue;
   if_sync_send["grp"] = syncGroups;
   if_sync_send["ret"] = udpNumRetries;
+  if_sync_send["hb"] = syncHeartbeatInterval; // WLED-LightMusic
 
   JsonObject if_nodes = interfaces.createNestedObject("nodes");
   if_nodes[F("list")] = nodeListEnabled;

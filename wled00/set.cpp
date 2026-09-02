@@ -27,6 +27,7 @@ void handleSettingsSet(AsyncWebServerRequest *request, byte subPage)
       char ip[5] = "IP"; ip[2] = 48+n; ip[4] = 0; //IP address
       char gw[5] = "GW"; gw[2] = 48+n; gw[4] = 0; //GW address
       char sn[5] = "SN"; sn[2] = 48+n; sn[4] = 0; //subnet mask
+      char pr[4] = "PR"; pr[2] = 48+n; pr[3] = 0; //WLED-LightMusic: connection priority
 #ifdef WLED_ENABLE_WPA_ENTERPRISE
       char et[4] = "ET"; et[2] = 48+n; et[3] = 0; //WiFi encryption type
       char ea[4] = "EA"; ea[2] = 48+n; ea[3] = 0; //enterprise anonymous identity
@@ -49,6 +50,11 @@ void handleSettingsSet(AsyncWebServerRequest *request, byte subPage)
         fillStr2MAC(multiWiFi[n].bssid, request->arg(bs).c_str());
         if (memcmp(oldBSSID, multiWiFi[n].bssid, 6) != 0) {  // check if BSSID changed
           forceReconnect = true;
+        }
+        if (request->hasArg(pr)) { // WLED-LightMusic: priority 0..255, higher connects first
+          uint8_t newPriority = constrain(request->arg(pr).toInt(), 0, 255);
+          if (newPriority != multiWiFi[n].priority) forceReconnect = true;
+          multiWiFi[n].priority = newPriority;
         }
         for (size_t i = 0; i < 4; i++) {
           ip[3] = 48+i;
@@ -444,6 +450,8 @@ void handleSettingsSet(AsyncWebServerRequest *request, byte subPage)
 
     t = request->arg(F("UR")).toInt();
     if ((t>=0) && (t<30)) udpNumRetries = t;
+    t = request->arg(F("HB")).toInt(); // WLED-LightMusic: heartbeat period, 0 = off, else >= 1000 ms
+    syncHeartbeatInterval = lightmusicNormalizeHeartbeatInterval(t < 0 ? 0 : (uint32_t)t);
 
 
     nodeListEnabled = request->hasArg(F("NL"));

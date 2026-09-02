@@ -54,6 +54,11 @@ constexpr size_t  WLED_MAX_USERMOD_PALETTES     = WLED_USERMOD_PALETTE_ID_BASE -
   #define WLED_MAX_WIFI_COUNT 3
 #endif
 
+// WLED-LightMusic: simultaneous SoftAP stations (core default is 4; ESP-IDF 4.4 DHCP serves at most 8)
+#ifndef LIGHTMUSIC_AP_MAX_CONNECTIONS
+  #define LIGHTMUSIC_AP_MAX_CONNECTIONS 8
+#endif
+
 #ifndef WLED_MAX_USERMODS
   #if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2)
     #define WLED_MAX_USERMODS 4
@@ -261,6 +266,7 @@ static_assert(WLED_MAX_BUSSES <= 32, "WLED_MAX_BUSSES exceeds hard limit");
 #define CALL_MODE_ALEXA         10
 #define CALL_MODE_WS_SEND       11     //special call mode, not for notifier, updates websocket only
 #define CALL_MODE_BUTTON_PRESET 12     //button/IR JSON preset/macro
+#define CALL_MODE_LIGHTMUSIC_HEARTBEAT 13 //WLED-LightMusic: periodic full-state re-broadcast (master -> nodes)
 
 //RGB to RGBW conversion mode
 #define RGBW_MODE_MANUAL_ONLY     0    // No automatic white channel calculation. Manual white channel slider

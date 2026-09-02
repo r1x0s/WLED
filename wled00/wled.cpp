@@ -67,6 +67,7 @@ void WLED::loop()
   #endif
   handleImprovWifiScan();
   handleNotifications();
+  handleLightmusicHeartbeat();
   handleTransitions();
   #ifdef WLED_ENABLE_DMX
   handleDMXOutput();
@@ -653,7 +654,13 @@ void WLED::initAP(bool resetAP)
   DEBUG_PRINT(F("Opening access point "));
   DEBUG_PRINTLN(apSSID);
   WiFi.softAPConfig(IPAddress(4, 3, 2, 1), IPAddress(4, 3, 2, 1), IPAddress(255, 255, 255, 0));
-  WiFi.softAP(apSSID, apPass, apChannel, apHide);
+  // WLED-LightMusic: allow up to LIGHTMUSIC_AP_MAX_CONNECTIONS stations (clamped to the platform limit)
+  #ifdef ARDUINO_ARCH_ESP32
+  constexpr uint8_t apMaxStations = lightmusicClampApMaxConnections(LIGHTMUSIC_AP_MAX_CONNECTIONS, kLightmusicApPlatformLimitEsp32);
+  #else
+  constexpr uint8_t apMaxStations = lightmusicClampApMaxConnections(LIGHTMUSIC_AP_MAX_CONNECTIONS, kLightmusicApPlatformLimitEsp8266);
+  #endif
+  WiFi.softAP(apSSID, apPass, apChannel, apHide, apMaxStations);
   #ifdef ARDUINO_ARCH_ESP32
   DEBUG_PRINT(F("access point maxTxPower set to ")); DEBUG_PRINTLN(txPower);
   WiFi.setTxPower(wifi_power_t(txPower));

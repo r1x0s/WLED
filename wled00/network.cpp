@@ -338,22 +338,29 @@ int findWiFi(bool doScan) {
     WiFi.scanNetworks(true);  // start scanning in asynchronous mode (will delete old scan)
   } else if (status >= 0) {   // status contains number of found networks (including duplicate SSIDs with different BSSID)
     DEBUG_PRINTF_P(PSTR("WiFi: Found %d SSIDs. @ %lus\n"), status, millis()/1000);
-    int rssi = -9999;
-    int selected = selectedWiFi;
+    // WLED-LightMusic: rank visible configured networks by priority, then RSSI, then config order
+    // (BSSID-pinned entries only match their own access point). See lightmusic_wifi_priority.h.
+    LightmusicWifiCandidate best = {0, 0, 0, false, false};
+    bool haveBest = false;
     for (int o = 0; o < status; o++) {
       DEBUG_PRINTF_P(PSTR(" SSID: %s (BSSID: %s) RSSI: %ddB\n"), WiFi.SSID(o).c_str(), WiFi.BSSIDstr(o).c_str(), WiFi.RSSI(o));
       for (unsigned n = 0; n < multiWiFi.size(); n++)
         if (!strcmp(WiFi.SSID(o).c_str(), multiWiFi[n].clientSSID)) {
-          bool foundBSSID = memcmp(multiWiFi[n].bssid, WiFi.BSSID(o), 6) == 0;
-          // find the WiFi with the strongest signal (but keep priority of entry if signal difference is not big)
-          if (foundBSSID || (n < selected && WiFi.RSSI(o) > rssi-10) || WiFi.RSSI(o) > rssi) {
-            rssi = foundBSSID ? 0 : WiFi.RSSI(o); // RSSI is only ever negative
-            selected = n;
+          LightmusicWifiCandidate c;
+          c.configIndex = n;
+          c.priority    = multiWiFi[n].priority;
+          c.rssi        = (int16_t)WiFi.RSSI(o);
+          c.bssidPinned = lightmusicBssidIsSet(multiWiFi[n].bssid);
+          c.bssidMatch  = memcmp(multiWiFi[n].bssid, WiFi.BSSID(o), 6) == 0;
+          if (lightmusicWifiCandidateEligible(c) && (!haveBest || lightmusicWifiCandidateBetter(c, best))) {
+            best = c;
+            haveBest = true;
           }
           break;
         }
     }
-    DEBUG_PRINTF_P(PSTR("WiFi: Selected SSID: %s RSSI: %ddB\n"), multiWiFi[selected].clientSSID, rssi);
+    int selected = haveBest ? best.configIndex : selectedWiFi; // no visible candidate: keep current (round-robin fallback)
+    DEBUG_PRINTF_P(PSTR("WiFi: Selected SSID: %s (prio %u)\n"), multiWiFi[selected].clientSSID, multiWiFi[selected].priority);
     return selected;
   }
   //DEBUG_PRINT(F("WiFi scan running."));

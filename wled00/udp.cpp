@@ -24,10 +24,14 @@ void notify(byte callMode, bool followUp)
 #else
   if (!udpConnected) return;
 #endif
-  if (!syncGroups || !sendNotificationsRT) return;
+  // WLED-LightMusic: the periodic heartbeat is independent of the runtime "send notifications" toggle
+  const bool isHeartbeat = (callMode == CALL_MODE_LIGHTMUSIC_HEARTBEAT);
+  if (!syncGroups) return;
+  if (!isHeartbeat && !sendNotificationsRT) return;
   switch (callMode)
   {
     case CALL_MODE_INIT:          return;
+    case CALL_MODE_LIGHTMUSIC_HEARTBEAT: break;
     case CALL_MODE_DIRECT_CHANGE: if (!notifyDirect) return; break;
     case CALL_MODE_BUTTON:        if (!notifyButton) return; break;
     case CALL_MODE_BUTTON_PRESET: if (!notifyButton) return; break;
@@ -196,14 +200,34 @@ void notify(byte callMode, bool followUp)
 #endif
   {
     DEBUG_PRINTLN(F("UDP sending packet."));
-    IPAddress broadcastIp = ~uint32_t(Network.subnetMask()) | uint32_t(Network.gatewayIP());
+    // WLED-LightMusic: AP-aware broadcast (upstream formula yields 0.0.0.255 on ESP32 while running as SoftAP only)
+    IPAddress broadcastIp = lightmusicBroadcastAddress(uint32_t(Network.localIP()), uint32_t(Network.subnetMask()), uint32_t(Network.gatewayIP()),
+                                                       apActive, uint32_t(WiFi.softAPIP()), uint32_t(IPAddress(255, 255, 255, 0)));
     notifierUdp.beginPacket(broadcastIp, udpPort);
     notifierUdp.write(udpOut, WLEDPACKETSIZE); // TODO: add actual used buffer size
     notifierUdp.endPacket();
   }
+  // WLED-LightMusic: a heartbeat neither arms retransmits nor opens the 1 s inbound suppression window
+  if (isHeartbeat) return;
   notificationSentCallMode = callMode;
   notificationSentTime = millis();
   notificationCount = followUp ? notificationCount + 1 : 0;
+}
+
+// WLED-LightMusic: re-broadcast the full state every `syncHeartbeatInterval` ms so that nodes which
+// (re)join the network converge within one period. Independent of the runtime "send" toggle
+// (see notify()), silent while a realtime stream is active, no burst after a stalled loop.
+void handleLightmusicHeartbeat() {
+  if (!syncHeartbeatInterval) return;
+  if (!udpConnected) return;
+  if (!(WLED_CONNECTED || apActive)) return;
+  if (realtimeMode != REALTIME_MODE_INACTIVE) return;
+  unsigned long now = millis();
+  // a regular notification already carried the full state: count it as the last beat
+  unsigned long lastFullState = (long)(notificationSentTime - lightmusicHeartbeatSentTime) > 0 ? notificationSentTime : lightmusicHeartbeatSentTime;
+  if (!lightmusicHeartbeatDue((uint32_t)now, (uint32_t)lastFullState, syncHeartbeatInterval)) return;
+  notify(CALL_MODE_LIGHTMUSIC_HEARTBEAT);
+  lightmusicHeartbeatSentTime = now;
 }
 
 static void parseNotifyPacket(const uint8_t *udpIn) {

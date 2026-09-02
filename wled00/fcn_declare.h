@@ -64,6 +64,7 @@ typedef struct WiFiConfig {
   char clientSSID[33];
   char clientPass[65];
   uint8_t bssid[6];
+  uint8_t priority = 0;   // WLED-LightMusic: 0..255, higher connects first (spec FR-1)
   IPAddress staticIP;
   IPAddress staticGW;
   IPAddress staticSN;
@@ -291,6 +292,7 @@ uint8_t realtimeBroadcast(uint8_t type, IPAddress client, uint16_t length, const
 void realtimeLock(uint32_t timeoutMs, byte md = REALTIME_MODE_GENERIC);
 void exitRealtime();
 void handleNotifications();
+void handleLightmusicHeartbeat(); // WLED-LightMusic: periodic full-state re-broadcast
 void setRealtimePixel(uint16_t i, byte r, byte g, byte b, byte w);
 void refreshNodeList();
 void sendSysInfoUDP();
