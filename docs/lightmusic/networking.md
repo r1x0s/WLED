@@ -42,18 +42,18 @@
 
 Файл `platformio_lightmusic.ini` подключён через `extra_configs` в `platformio.ini`.
 
-| Профиль | База | Особенности |
-|---|---|---|
-| `lightmusic_master_esp32` | `esp32dev` | `audioreactive` (INMP441), SoftAP 8, heartbeat 1000 мс, 2D/GIF/WS/OTA |
-| `lightmusic_node_esp8266` | `nodemcuv2` (4 MB) | без аудио, без Particle System 2D (как upstream для 4 MB), 1D ленты |
-| `lightmusic_node_esp32` | `esp32dev` | без аудио, 2D/GIF/PS |
-| `lightmusic_node_esp32c3` | `esp32c3dev` | без аудио, одно ядро — проверять FPS |
-| `lightmusic_node_esp32s3` | `esp32s3_4M_qspi` | без аудио, PSRAM |
-| `lightmusic_node_esp32s2` | `lolin_s2_mini` | без аудио |
+| Профиль | База | Аудио | Особенности |
+|---|---|---|---|
+| `lightmusic_master_esp32` | `esp32dev` | INMP441 (I²S), UDP Sound Sync **send** | SoftAP 8, heartbeat 1000 мс, 2D/GIF/WS/OTA |
+| `lightmusic_node_esp8266` | `nodemcuv2` (4 MB) | Sound Sync **receive** (FFT/I²S вырезаны) | без Particle System 2D (upstream-ограничение), 1D ленты |
+| `lightmusic_node_esp32` | `esp32dev` | Sound Sync **receive**, mic type 254 | 2D/GIF/PS |
+| `lightmusic_node_esp32c3` | `esp32c3dev` | Sound Sync **receive**, mic type 254 | одно ядро — проверять FPS |
+| `lightmusic_node_esp32s3` | `esp32s3_4M_qspi` | Sound Sync **receive**, mic type 254 | PSRAM |
+| `lightmusic_node_esp32s2` | `lolin_s2_mini` | Sound Sync **receive**, mic type 254 | |
 
-Во всех профилях отключены: Alexa, Hue Sync, IR, MQTT, Adalight, Loxone, ESP-NOW. Общие defines: `LIGHTMUSIC_FORK`, `LIGHTMUSIC_ROLE_MASTER`/`LIGHTMUSIC_ROLE_NODE`, `LIGHTMUSIC_AP_MAX_CONNECTIONS`, `LIGHTMUSIC_SYNC_HEARTBEAT_INTERVAL`.
+Во всех профилях отключены: Alexa, Hue Sync, IR, MQTT, Adalight, Loxone, ESP-NOW. Общие defines: `LIGHTMUSIC_FORK`, `LIGHTMUSIC_ROLE_MASTER`/`LIGHTMUSIC_ROLE_NODE`, `LIGHTMUSIC_AP_MAX_CONNECTIONS`, `LIGHTMUSIC_SYNC_HEARTBEAT_INTERVAL`, `UM_AUDIOREACTIVE_ENABLE`, `LIGHTMUSIC_AUDIOSYNC_MODE` (1 send / 2 receive), для ESP32-нод `SR_DMTYPE=254`.
 
-Подводные камни PlatformIO, учтённые в файле: при `extends` список `build_flags` **заменяется**, а скрипт `pio-scripts/output_bins.py` берёт первое `WLED_RELEASE_NAME` — поэтому флаги в каждом env перечислены полностью; `custom_usermods` наследуется, поэтому node-профили явно обнуляют его.
+Подводные камни PlatformIO, учтённые в файле: при `extends` список `build_flags` **заменяется**, а скрипт `pio-scripts/output_bins.py` берёт первое `WLED_RELEASE_NAME` — поэтому флаги в каждом env перечислены полностью; `custom_usermods` наследуется, поэтому каждый профиль задаёт его явно (сейчас — `audioreactive` везде).
 
 Сборка:
 

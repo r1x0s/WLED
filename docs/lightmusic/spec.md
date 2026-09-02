@@ -438,7 +438,20 @@ test/lightmusic/node_registry_test.cpp
 
 ### 5.5 Audio Feature Sync
 
-**Не реализовано.** Текущая master-прошивка включает `audioreactive` для локального анализа INMP441, но `lightmusic_node_esp8266` пока не получает FFT/audio features и не выполняет локальную отрисовку по удалённому аудиосигналу. Это следующий основной этап после pairing/provisioning.
+**Реализован базовый режим** (Этап 2, 2026-09-02) поверх upstream UDP Sound Sync V2 усермода `audioreactive` — код передачи/приёма и подстановка данных в эффекты уже были в upstream, в форке добавлены умолчания:
+
+- `LIGHTMUSIC_AUDIOSYNC_MODE` — build-time умолчание режима (master 1 = send, ноды 2 = receive), `UM_AUDIOREACTIVE_ENABLE` во всех профилях;
+- все node-профили собирают `audioreactive`; ESP32-ноды с `SR_DMTYPE=254` («network receive only»), ESP8266 — receive-only сборка upstream;
+- ноды рендерят audio-reactive эффекты локально по данным master, микрофон не нужен.
+
+**Отложено до полевого теста:** group mask и sequence в reserved-байтах пакета, purge очереди на приёме, таймаут с затуханием (сейчас при потере пакетов нода замирает на последнем кадре), переключатель multicast/broadcast, настраиваемая частота отправки (сейчас ~50 Гц). См. `sync-protocol.md`.
+
+Файлы:
+
+```text
+usermods/audioreactive/audio_reactive.cpp
+platformio_lightmusic.ini
+```
 
 ---
 
@@ -493,12 +506,13 @@ git diff --check
 npm test: 16 / 16 passed
 host tests: 5 модулей × 2 стандарта, все зелёные
 
+Этап 2 (audioreactive во всех профилях: master send, ноды receive):
 lightmusic_master_esp32:      RAM 79,720 / 327,680 (24.3%)  Flash 1,226,685 / 1,572,864 (78.0%)
-lightmusic_node_esp8266:      RAM 44,932 /  81,920 (54.8%)  Flash   855,023 / 1,044,464 (81.9%)
-lightmusic_node_esp32:        RAM 79,184 / 327,680 (24.2%)  Flash 1,186,881 / 1,572,864 (75.5%)
-lightmusic_node_esp32c3:      RAM 69,656 / 327,680 (21.3%)  Flash 1,150,718 / 1,572,864 (73.2%)
-lightmusic_node_esp32s3:      RAM 42,980 / 327,680 (13.1%)  Flash 1,122,893 / 1,572,864 (71.4%)
-lightmusic_node_esp32s2:      RAM 50,128 / 327,680 (15.3%)  Flash 1,134,106 / 1,572,864 (72.1%)
+lightmusic_node_esp8266:      RAM 45,108 /  81,920 (55.1%)  Flash   862,619 / 1,044,464 (82.6%)
+lightmusic_node_esp32:        RAM 79,720 / 327,680 (24.3%)  Flash 1,226,685 / 1,572,864 (78.0%)
+lightmusic_node_esp32c3:      RAM 70,152 / 327,680 (21.4%)  Flash 1,187,938 / 1,572,864 (75.5%)
+lightmusic_node_esp32s3:      RAM 43,492 / 327,680 (13.3%)  Flash 1,159,641 / 1,572,864 (73.7%)
+lightmusic_node_esp32s2:      RAM 50,624 / 327,680 (15.4%)  Flash 1,168,186 / 1,572,864 (74.3%)
 
 Эксперимент: ESP8266 с Particle System 2D не собирается (upstream #error: 1D и 2D PS
 одновременно на ESP8266 не поддерживаются) — нода ESP8266 остаётся с PS 1D.
@@ -518,6 +532,9 @@ lightmusic_node_esp32s2:      RAM 50,128 / 327,680 (15.3%)  Flash 1,134,106 / 1,
 8. INMP441 корректно отдаёт аудиоданные; Wi‑Fi и LED rendering не деградируют недопустимо.
 9. OTA обновляет master и node profile.
 10. 2D ESP32 node корректно принимает segment state.
+11. Audio: master с INMP441 показывает уровень/GEQ на странице Info; в настройках usermod `sync:mode = Send`.
+12. Audio: нода без микрофона (ESP8266 и ESP32), подключённая к SoftAP master, показывает «Sound Sync: receiving v2» и реагирует эффектом GEQ/Gravcenter на музыку у master; задержка визуально приемлема.
+13. Audio: при остановке музыки нода замирает на последнем кадре (ожидаемо до реализации таймаута) и оживает при возобновлении.
 
 ---
 
@@ -534,15 +551,15 @@ build_output/release/WLED_16.0.1_Lightmusic_Node_ESP32-S3_4M.bin
 build_output/release/WLED_16.0.1_Lightmusic_Node_ESP32-S2.bin
 ```
 
-Проверенные SHA-256 сборки Этапа 1 (2026-09-02):
+Проверенные SHA-256 сборки Этапа 2 (2026-09-02):
 
 ```text
-59c57a2a5aad1a9c13377aa2da303323e7bd6276cea2ff6672926cfce403e336  WLED_16.0.1_Lightmusic_Master_ESP32.bin
-199e0d6e7ae44b1770e84e5e37925bd7413e6d03cad11b92552d91f42d1a76e3  WLED_16.0.1_Lightmusic_Node_ESP8266.bin
-33c81354ee8a2012daf2fd86e9e32bd5638f239a7b4fb4b55831883911fd8800  WLED_16.0.1_Lightmusic_Node_ESP32.bin
-4241a27ce1f06bda41e1f77d8c4f47b9b7d5b5608798348350e784a01432b732  WLED_16.0.1_Lightmusic_Node_ESP32-C3.bin
-ad12f39b6d3cce49a6e81a671cbaf8071cce13f103d531824b159a6115d48352  WLED_16.0.1_Lightmusic_Node_ESP32-S3_4M.bin
-2d23b850db4670956c5cf6fa791d71ca1da042945668cd20b0d8a1c20bf31316  WLED_16.0.1_Lightmusic_Node_ESP32-S2.bin
+ecc56bef8f1949659fcc90306c5c5f1fb53f8335bcd1b327e6d640a9e106c9e5  WLED_16.0.1_Lightmusic_Master_ESP32.bin
+b0344febd9d4a89951c6eb74e46b7bf3330fce085b6d54dbf558808859e75c87  WLED_16.0.1_Lightmusic_Node_ESP8266.bin
+8c11255a8e8bb36a08e8d0a099aa6115ca32ec351fa8ae47a46f41f22cff68c2  WLED_16.0.1_Lightmusic_Node_ESP32.bin
+7d48c5f0e32f92f415cbd25f4f2a82527f88fc915a9cd643c5871e1c644334a4  WLED_16.0.1_Lightmusic_Node_ESP32-C3.bin
+5497d51c6bdfa61f3f9550020d29474c6216d3d35aff4c9ee992495e209d7e94  WLED_16.0.1_Lightmusic_Node_ESP32-S3_4M.bin
+e11f0b9b20c944c888f391fa72b0e97c7c5f8704fae66402cc7e5b05aafdc3ec  WLED_16.0.1_Lightmusic_Node_ESP32-S2.bin
 ```
 
 > После последующих изменений firmware нужно всегда пересчитать checksums и выдать новые бинарники.
