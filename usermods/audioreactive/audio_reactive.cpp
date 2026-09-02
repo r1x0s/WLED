@@ -74,7 +74,11 @@
 #define MAX_PALETTES 3
 
 static volatile bool disableSoundProcessing = false;      // if true, sound processing (FFT, filters, AGC) will be suspended. "volatile" as its shared between tasks.
-static uint8_t audioSyncEnabled = 0;          // bit field: bit 0 - send, bit 1 - receive (config value)
+// WLED-LightMusic: build-time default for UDP sound sync mode (master profile: 1 = send, node profiles: 2 = receive)
+#ifndef LIGHTMUSIC_AUDIOSYNC_MODE
+  #define LIGHTMUSIC_AUDIOSYNC_MODE 0   // upstream default: sound sync off
+#endif
+static uint8_t audioSyncEnabled = LIGHTMUSIC_AUDIOSYNC_MODE; // bit field: bit 0 - send, bit 1 - receive (config value)
 static bool udpSyncConnected = false;         // UDP connection status -> true if connected to multicast group
 
 #define NUM_GEQ_CHANNELS 16                                           // number of frequency channels. Don't change !!
